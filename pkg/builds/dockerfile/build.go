@@ -40,13 +40,20 @@ type Options struct {
 	// The path within the build context in which to execute the build.
 	Path string
 
+	// KanikoImage the container image to use for kaniko
+	KanikoImage string
+
 	// The extra kaniko arguments for handling things like insecure registries
 	KanikoArgs []string
 }
 
 // Build returns a TaskRun suitable for performing a Dockerfile build over the
 // provided kontext and publishing to the target tag.
-func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, opt Options) *tknv1beta1.TaskRun {
+func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, opts Options) *tknv1beta1.TaskRun {
+	image := opts.KanikoImage
+	if image == "" {
+		image = KanikoImage
+	}
 	return &tknv1beta1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dockerfile-",
@@ -64,17 +71,17 @@ func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, 
 				Steps: append(sourceSteps, tknv1beta1.Step{
 					Container: corev1.Container{
 						Name:  "build-and-push",
-						Image: KanikoImage,
+						Image: image,
 						Env: []corev1.EnvVar{{
 							Name:  "DOCKER_CONFIG",
 							Value: "/tekton/home/.docker",
 						}},
 						Args: append([]string{
-							"--dockerfile=" + filepath.Join("/workspace", opt.Path, opt.Dockerfile),
+							"--dockerfile=" + filepath.Join("/workspace", opts.Path, opts.Dockerfile),
 
 							// We expand into /workspace, and publish to the specified
 							// output resource image.
-							"--context=" + filepath.Join("/workspace", opt.Path),
+							"--context=" + filepath.Join("/workspace", opts.Path),
 							"--destination=" + target.Name(),
 
 							// Write out the digest to the appropriate result file.
@@ -83,7 +90,7 @@ func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, 
 							// Enable kanikache to get incremental builds
 							"--cache=true",
 							"--cache-ttl=24h",
-						}, opt.KanikoArgs...),
+						}, opts.KanikoArgs...),
 					},
 				}),
 			},
