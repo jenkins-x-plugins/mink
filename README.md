@@ -17,6 +17,68 @@ Download the [jx-mink binary](https://github.com/jenkins-x-plugins/jx-mink/relea
 
 See the [jx-mink command reference](https://github.com/jenkins-x-plugins/jx-mink/blob/master/docs/cmd/jx-mink.md#jx-mink)
 
+
+## Using inside pipelines
+
+The `jx-mink step` command is a plugin replacement for the kaniko images we've been using in [Jenkins X V3](https://jenkins-x.io/v3/) up to now. Its used as follows:
+
+```yaml 
+- image: gcr.io/jenkinsxio/jx-mink:0.19.8
+  name: build-container-build
+  script: |
+    #!/busybox/sh
+    source .jx/variables.sh
+    jx-mink step
+```
+
+This will use the `jx-mink init` command to create a `.mink.yaml` file if the file does not already exist and it can find a Dockerfile/build pack and a chart.
+
+You can configure the `.mink.yaml` to point at whatever dockerfiles/buildpacks/charts you want in the usual [mink way](https://github.com/mattmoor/mink).
+
+The step will then invoke the build steps using either kaniko, ko or a build pack to generate the container image(s).
+
+Finally the image digests will be added into any configured YAML file such as the charts `values.yaml` file as an entry `image.fullName` in the released chart.
+
+ 
+### Using vanilla kaniko
+
+If you wish to switch to using just kaniko without using a `.mink.yaml` file and only creating a single image from a single `Dockerfile` then switch to using `jx-mink build`:
+
+```yaml 
+- image: gcr.io/jenkinsxio/jx-mink:0.19.8
+  name: build-container-build
+  script: |
+    #!/busybox/sh
+    source .jx/variables.sh
+    jx-mink build
+```
+
+### Configuration
+
+All of the configuration options you can see via `jx mink step --help`  or `jx mink build --help` are available to be configured inside your pipeline. For any command line argument if you convert it to upper case, replace "-" separators with "_" and add the `"MINK_"` prefix.
+
+e.g. to define the image to build you can specify `MINK_IMAGE` as an environment variable.
+
+To specify environment variables you can modify the pipeilne YAML directly, or you can just add whatever variables you want (with default bash expressions and bash conditions etc) to the file `.jx/variables.sh`.
+
+```bash 
+# contents of .jx/variables.sh
+                                
+# lets disable invoking knaiko locally so that we invoke it with a separate TaskRun
+export MINK_LOCAL_KANIKO="false"                                                   
+
+# lets configure the kaniko image we want to use
+export MINK_KANIKO_IMAGE="gcr.io/kaniko-project/executor:v1.3.0"                                                   
+```
+
+## Using locally
+
+You can use the `jx` CLI to invoke `jx mink` locally to perform image builds on your local laptop. The actual kaniko, ko or build pack builds are performed inside the kubernetes cluster using a `TaskRun`
+
+When using `jx mink step`  or `jx mink build` you can specify the `bundle` parameter if you wish to get mink to create a self extracting image of your local source code. Otherwise `jx mink` defaults to passing the git URL and SHA to the build steps so it can use a regular git clone to get the source code.
+
+
+
 ## Differences from mink
 
 This binary has tried to keep as close to [mink](https://github.com/mattmoor/mink) as possible in code and UX but it has a few minor differences to smooth the integration into [Jenkins X](https://jenkins-x.io/) pipelines. Hopefully over time these differences can combine into a single mink codebase and binary.
