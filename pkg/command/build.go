@@ -19,6 +19,8 @@ package command
 import (
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/mattmoor/mink/pkg/builds"
 	"github.com/mattmoor/mink/pkg/builds/dockerfile"
@@ -84,11 +86,16 @@ type dockerfileOptions struct {
 func (opts *dockerfileOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().String("dockerfile", "Dockerfile", "The path to the Dockerfile within the build context.")
 	cmd.Flags().String("kaniko-image", dockerfile.KanikoImage, "The kaniko container image to use.")
-	cmd.Flags().StringSlice("kaniko-args", nil, "Optional arguments to pass to kaniko for dealing with insecure registries. For details see: https://github.com/GoogleContainerTools/kaniko/blob/master/README.md#additional-flags")
+	cmd.Flags().StringSlice("kaniko-flag", nil, "Optional flag to pass to kaniko for dealing with insecure registries. For details see: https://github.com/GoogleContainerTools/kaniko/blob/master/README.md#additional-flags")
 }
 
 // Validate implements Interface
 func (opts *dockerfileOptions) Validate(cmd *cobra.Command, args []string) error {
+	// lets import the default Jenkins X kaniko flags if no other flags are supplied
+	kanikoFlags := os.Getenv("KANIKO_FLAGS")
+	if kanikoFlags != "" {
+		viper.SetDefault("kaniko-flag", strings.Split(kanikoFlags, " "))
+	}
 	opts.Dockerfile = viper.GetString("dockerfile")
 	if opts.Dockerfile == "" {
 		return apis.ErrMissingField("dockerfile")
@@ -99,7 +106,7 @@ func (opts *dockerfileOptions) Validate(cmd *cobra.Command, args []string) error
 	}
 
 	opts.KanikoImage = viper.GetString("kaniko-image")
-	opts.KanikoArgs = viper.GetStringSlice("kaniko-args")
+	opts.KanikoArgs = viper.GetStringSlice("kaniko-flag")
 	return nil
 }
 
