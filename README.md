@@ -13,10 +13,6 @@
 
 Download the [jx-mink binary](https://github.com/jenkins-x-plugins/mink/releases) for your operating system and add it to your `$PATH`.
 
-## Commands
-
-See the [jx-mink command reference](https://github.com/jenkins-x-plugins/mink/blob/master/docs/cmd/jx-mink.md#jx-mink)
-
 
 ## Using inside pipelines
 
