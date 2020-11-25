@@ -13,7 +13,7 @@ RUN addgroup -S app \
     
 RUN echo using jx-mink version $VERSION and OS $TARGETOS arch $TARGETARCH && \
   cd /tmp && \
-  curl -k -L https://github.com/jenkins-x-plugins/jx-mink/releases/download/v$VERSION/jx-mink-$TARGETOS-$TARGETARCH.tar.gz | tar xzv && \
+  curl -k -L https://github.com/jenkins-x-plugins/mink/releases/download/v$VERSION/jx-mink-$TARGETOS-$TARGETARCH.tar.gz | tar xzv && \
   mv jx-mink /jx-mink
 
 FROM gcr.io/kaniko-project/executor:debug-v1.3.0
