@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/jenkins-x/jx-helpers/v3/pkg/files"
-	"github.com/jenkins-x/jx-helpers/v3/pkg/kube"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,20 +78,7 @@ func (opts *StepOptions) AddFlags(cmd *cobra.Command) {
 // Validate implements Interface
 func (opts *StepOptions) Validate(cmd *cobra.Command, args []string) error {
 	viper.SetDefault("output", ".")
-	gitURL := os.Getenv("REPO_URL")
-	if gitURL != "" {
-		viper.SetDefault("git-url", gitURL)
-	}
-	gitRev := os.Getenv("PULL_PULL_SHA")
-	if gitRev == "" {
-		gitRev = os.Getenv("PULL_BASE_SHA")
-	}
-	if gitRev != "" {
-		viper.SetDefault("git-rev", gitRev)
-	}
-	if kube.IsInCluster() {
-		viper.SetDefault("local-kaniko", "true")
-	}
+	setViperGitAndKanikoDefaults(cmd.OutOrStdout())
 
 	// Validate the bundle arguments.
 	if err := opts.ResolveOptions.Validate(cmd, args); err != nil {

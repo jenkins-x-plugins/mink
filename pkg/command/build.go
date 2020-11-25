@@ -19,8 +19,6 @@ package command
 import (
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/mattmoor/mink/pkg/builds"
 	"github.com/mattmoor/mink/pkg/builds/dockerfile"
@@ -91,11 +89,8 @@ func (opts *dockerfileOptions) AddFlags(cmd *cobra.Command) {
 
 // Validate implements Interface
 func (opts *dockerfileOptions) Validate(cmd *cobra.Command, args []string) error {
-	// lets import the default Jenkins X kaniko flags if no other flags are supplied
-	kanikoFlags := os.Getenv("KANIKO_FLAGS")
-	if kanikoFlags != "" {
-		viper.SetDefault("kaniko-flag", strings.Split(kanikoFlags, " "))
-	}
+	setViperGitAndKanikoDefaults(cmd.OutOrStdout())
+
 	opts.Dockerfile = viper.GetString("dockerfile")
 	if opts.Dockerfile == "" {
 		return apis.ErrMissingField("dockerfile")
