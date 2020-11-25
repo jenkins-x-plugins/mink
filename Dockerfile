@@ -28,8 +28,9 @@ LABEL maintainer="jenkins-x"
 
 COPY --from=0 /jx-mink /usr/bin/jx-mink
 
-RUN ln -s /busybox /bin
-
 ENV HOME /kaniko
-ENV PATH /usr/local/bin:/bin:/usr/bin:/kaniko:/ko-app
+ENV PATH /usr/local/bin:/bin:/usr/bin:/kaniko:/busybox
+
+# lets put the shell in a more common location
+RUN /busybox/ln -s /busybox /bin
 
