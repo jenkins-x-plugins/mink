@@ -70,7 +70,7 @@ func (opts *InitOptions) AddFlags(cmd *cobra.Command) {
 
 // Validate implements Interface
 func (opts *InitOptions) Validate(cmd *cobra.Command, args []string) error {
-	opts.Dir = viper.GetString("dir")
+	opts.Directory = viper.GetString("directory")
 	opts.Dockerfile = viper.GetString("dockerfile")
 	opts.NoGit = viper.GetBool("no-git")
 	return nil
@@ -82,8 +82,8 @@ type InitOptions struct {
 	// Dockerfile is the default relative path to the Dockerfile within the directory to look for
 	Dockerfile string
 
-	// Dir is the directory to look inside for chart folders
-	Dir string
+	// Directory is the directory to look inside for chart folders
+	Directory string
 
 	// NoGit disables adding the generated .mink.yaml to git
 	NoGit bool
@@ -114,7 +114,7 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	minkFile := filepath.Join(opts.Dir, minkFileName)
+	minkFile := filepath.Join(opts.Directory, minkFileName)
 	exists, err := files.FileExists(minkFile)
 	if err != nil {
 		return errs.Wrapf(err, "failed to check if file exists %s", minkFile)
@@ -133,7 +133,7 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 	}
 
 	// lets add an image ref to the first chart
-	err = opts.addImageToValuesFile(image, filepath.Join(opts.Dir, chartDirs[0]))
+	err = opts.addImageToValuesFile(image, filepath.Join(opts.Directory, chartDirs[0]))
 	if err != nil {
 		return errs.Wrapf(err, "failed to add image to values file")
 	}
@@ -145,7 +145,7 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 	opts.MinkEnabled = true
 
 	if !opts.NoGit {
-		err = opts.AddToGit(opts.Dir, minkFileName)
+		err = opts.AddToGit(opts.Directory, minkFileName)
 		if err != nil {
 			return errs.Wrapf(err, "failed to add mink file to git")
 		}
@@ -155,7 +155,7 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 
 func (opts *InitOptions) findHelmChartDirs() ([]string, error) {
 	var dirs []string
-	err := filepath.Walk(opts.Dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(opts.Directory, func(path string, info os.FileInfo, err error) error {
 		if info == nil || info.IsDir() {
 			return nil
 		}
@@ -164,7 +164,7 @@ func (opts *InitOptions) findHelmChartDirs() ([]string, error) {
 			return nil
 		}
 		dir := filepath.Dir(path)
-		dir, err = filepath.Rel(opts.Dir, dir)
+		dir, err = filepath.Rel(opts.Directory, dir)
 		if err != nil {
 			return errs.Wrapf(err, "failed to find relative dir for %s", path)
 		}
@@ -200,7 +200,7 @@ func (opts *InitOptions) createMinkFile(file string, dirs []string) error {
 
 func (opts *InitOptions) findMinkImage() (string, error) {
 	// check for a Dockerfile
-	f := filepath.Join(opts.Dir, opts.Dockerfile)
+	f := filepath.Join(opts.Directory, opts.Dockerfile)
 	exists, err := files.FileExists(f)
 	if err != nil {
 		return "", errs.Wrapf(err, "failed to check if file exists %s", f)
@@ -210,7 +210,7 @@ func (opts *InitOptions) findMinkImage() (string, error) {
 	}
 
 	// check for build pack
-	f = filepath.Join(opts.Dir, "overrides.toml")
+	f = filepath.Join(opts.Directory, "overrides.toml")
 	exists, err = files.FileExists(f)
 	if err != nil {
 		return "", errs.Wrapf(err, "failed to check if file exists %s", f)

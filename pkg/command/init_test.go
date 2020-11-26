@@ -18,23 +18,24 @@ func TestCommandInit(t *testing.T) {
 
 	t.Logf("running tests in %s\n", tmpDir)
 
-	fs, err := ioutil.ReadDir("test_data")
+	testData := filepath.Join("test_data", "init")
+	fs, err := ioutil.ReadDir(testData)
 
 	for _, f := range fs {
 		if !f.IsDir() {
 			continue
 		}
 		name := f.Name()
-		srcFile := filepath.Join("test_data", name)
-		require.DirExists(t, srcFile)
+		srcDir := filepath.Join(testData, name)
+		require.DirExists(t, srcDir)
 
 		destDir := filepath.Join(tmpDir, name)
-		err = files.CopyDirOverwrite(srcFile, destDir)
-		require.NoError(t, err, "failed to copy %s to %s", srcFile, destDir)
+		err = files.CopyDirOverwrite(srcDir, destDir)
+		require.NoError(t, err, "failed to copy %s to %s", srcDir, destDir)
 
 		cmd := command.NewInitCommand()
 		o := &command.InitOptions{
-			Dir:        destDir,
+			Directory:  destDir,
 			Dockerfile: "Dockerfile",
 			NoGit:      true,
 		}
