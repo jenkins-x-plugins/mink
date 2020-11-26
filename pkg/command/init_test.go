@@ -36,6 +36,7 @@ func TestCommandInit(t *testing.T) {
 		o := &command.InitOptions{
 			Dir:        destDir,
 			Dockerfile: "Dockerfile",
+			NoGit:      true,
 		}
 		err = o.Execute(cmd, nil)
 		require.NoError(t, err, "failed for test %s", name)

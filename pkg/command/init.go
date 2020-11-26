@@ -114,20 +114,6 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	image, err := opts.findMinkImage()
-	if err != nil {
-		return errs.Wrapf(err, "failed to find mink image string")
-	}
-	if image == "" {
-		return nil
-	}
-
-	// lets add an image ref to the first chart
-	err = opts.addImageToValuesFile(image, chartDirs[0])
-	if err != nil {
-		return errs.Wrapf(err, "failed to add image to values file")
-	}
-
 	minkFile := filepath.Join(opts.Dir, minkFileName)
 	exists, err := files.FileExists(minkFile)
 	if err != nil {
@@ -137,6 +123,21 @@ func (opts *InitOptions) Execute(cmd *cobra.Command, args []string) error {
 		opts.MinkEnabled = true
 		return nil
 	}
+
+	image, err := opts.findMinkImage()
+	if err != nil {
+		return errs.Wrapf(err, "failed to find mink image string")
+	}
+	if image == "" {
+		return nil
+	}
+
+	// lets add an image ref to the first chart
+	err = opts.addImageToValuesFile(image, filepath.Join(opts.Dir, chartDirs[0]))
+	if err != nil {
+		return errs.Wrapf(err, "failed to add image to values file")
+	}
+
 	err = opts.createMinkFile(minkFile, chartDirs)
 	if err != nil {
 		return errs.Wrapf(err, "failed to ")
@@ -163,6 +164,10 @@ func (opts *InitOptions) findHelmChartDirs() ([]string, error) {
 			return nil
 		}
 		dir := filepath.Dir(path)
+		dir, err = filepath.Rel(opts.Dir, dir)
+		if err != nil {
+			return errs.Wrapf(err, "failed to find relative dir for %s", path)
+		}
 		dirs = append(dirs, dir)
 		return nil
 	})

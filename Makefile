@@ -2,7 +2,7 @@
 rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
 SHELL := /bin/bash
-NAME := jx-project
+NAME := mink
 BINARY_NAME := jx-mink
 BUILD_TARGET = build
 MAIN_SRC_FILE=cmd/mink/main.go
@@ -16,7 +16,7 @@ ROOT_PACKAGE := github.com/$(ORG_REPO)
 #GO_VERSION := $(shell $(GO) version | sed -e 's/^[^0-9.]*\([0-9.]*\).*/\1/')
 GO_VERSION := 1.13
 
-GO_DEPENDENCIES := $(call rwildcard,pkg/,*.go) $(call rwildcard,cmd/j,*.go)
+GO_DEPENDENCIES := $(call rwildcard,pkg/,*.go) $(call rwildcard,cmd/,*.go)
 
 GOPRIVATE := github.com/jenkins-x/jx-apps,github.com/jenkins-x/jx-helpers
 
@@ -100,6 +100,7 @@ tidy-deps: ## Cleans up dependencies
 make-reports-dir:
 	mkdir -p $(REPORTS_DIR)
 
+.PHONY: test
 test: ## Run tests with the "unit" build tag
 	KUBECONFIG=/cluster/connections/not/allowed CGO_ENABLED=$(CGO_ENABLED) $(GOTEST) --tags="integration unit" -failfast -short ./... $(TEST_BUILDFLAGS)
 
