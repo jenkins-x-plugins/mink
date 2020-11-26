@@ -30,6 +30,9 @@ import (
 const (
 	// KanikoImage is the path to the kaniko image we use for Dockerfile builds.
 	KanikoImage = "gcr.io/kaniko-project/executor:multi-arch"
+
+	// DigestFile default digest file name
+	DigestFile = "/tekton/results/IMAGE-DIGEST"
 )
 
 // Options holds configuration options specific to Dockerfile builds
@@ -39,6 +42,9 @@ type Options struct {
 
 	// The path within the build context in which to execute the build.
 	Path string
+
+	// DigestFile the digest file thats created
+	DigestFile string
 
 	// KanikoImage the container image to use for kaniko
 	KanikoImage string
@@ -53,6 +59,10 @@ func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, 
 	image := opts.KanikoImage
 	if image == "" {
 		image = KanikoImage
+	}
+	digestFile := opts.DigestFile
+	if digestFile == "" {
+		digestFile = DigestFile
 	}
 	return &tknv1beta1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,7 +95,7 @@ func Build(ctx context.Context, sourceSteps []tknv1beta1.Step, target name.Tag, 
 							"--destination=" + target.Name(),
 
 							// Write out the digest to the appropriate result file.
-							"--digest-file=/tekton/results/IMAGE-DIGEST",
+							"--digest-file=" + digestFile,
 
 							// Enable kanikache to get incremental builds
 							"--cache=true",

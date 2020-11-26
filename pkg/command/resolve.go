@@ -438,7 +438,7 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 	}
 
 	if opts.LocalKaniko {
-		return opts.runLocalBuild(tr, opts.KanikoBinary)
+		return opts.runLocalBuild(tr, opts.KanikoBinary, digestFile)
 	}
 	// Run the produced Build definition to completion, streaming logs to stdout, and
 	// returning the digest of the produced image.
@@ -554,7 +554,7 @@ func (opts *ResolveOptions) refsFromDoc(doc *yaml.Node) yit.Iterator {
 		Filter(yit.Union(ps...))
 }
 
-func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary string) (name.Digest, error) {
+func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, digestFile string) (name.Digest, error) {
 	args := tr.Spec.TaskSpec.Steps[len(tr.Spec.TaskSpec.Steps)-1].Args
 
 	// lets replace the context with the current dir
@@ -572,8 +572,6 @@ func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary string)
 		}
 	}
 	argsText := strings.Join(args, " ")
-
-	const digestFile = "/tekton/results/IMAGE-DIGEST"
 
 	dir := filepath.Dir(digestFile)
 	err = os.MkdirAll(dir, 0760)
