@@ -17,6 +17,7 @@ limitations under the License.
 package command
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"knative.dev/pkg/signals"
 )
 
 var stepExample = fmt.Sprintf(`
@@ -60,6 +62,9 @@ type StepOptions struct {
 
 	// Out the output destination
 	Out io.Writer
+
+	// Ctx allows tests to use a non-Ctrl-c handler for loops in tests
+	Ctx context.Context
 }
 
 // StepOptions implements Interface
@@ -94,6 +99,16 @@ func (opts *StepOptions) Validate(cmd *cobra.Command, args []string) error {
 
 // Execute implements Interface
 func (opts *StepOptions) Execute(cmd *cobra.Command, args []string) error {
+	// Handle ctrl+C
+	if opts.Ctx == nil {
+		opts.Ctx = signals.NewContext()
+	}
+	return opts.execute(opts.Ctx, cmd)
+}
+
+// execute is the workhorse of execute, but factored to support composition
+// with apply (provides its own ctx)
+func (opts *StepOptions) execute(ctx context.Context, cmd *cobra.Command) error {
 	if opts.Out == nil {
 		opts.Out = cmd.OutOrStdout()
 	}
@@ -109,10 +124,10 @@ func (opts *StepOptions) Execute(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if !opts.InitOptions.MinkEnabled {
+	if !opts.InitOptions.MinkEnabled && len(opts.Filenames) == 0 {
 		return nil
 	}
-	return opts.ResolveOptions.Execute(cmd, args)
+	return opts.ResolveOptions.execute(ctx, cmd)
 }
 
 func (opts *StepOptions) copyKanikoDockerSecrets() error {

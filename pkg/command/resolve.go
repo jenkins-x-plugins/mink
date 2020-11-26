@@ -139,6 +139,9 @@ func (opts *ResolveOptions) AddFlags(cmd *cobra.Command) {
 
 // Validate implements Interface
 func (opts *ResolveOptions) Validate(cmd *cobra.Command, args []string) error {
+	// disable validation of the image string as it may have expressions which we resolve via each filename...
+	opts.BaseBuildOptions.NoImageValidate = true
+
 	// Validate the bundle arguments.
 	if err := opts.BaseBuildOptions.Validate(cmd, args); err != nil {
 		return err
@@ -420,8 +423,26 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 	// My fundamental conflict is that I'd like for `mink buildpack` to be consistent,
 	// and they have different views of the filesystem (more will work here)...
 
-	tr := dockerfile.Build(ctx, sourceSteps, opts.tag, dockerfile.Options{
-		Dockerfile: filepath.Join(u.Path, opts.Dockerfile),
+	path := u.Path
+
+	imageName, tag, err := opts.ResolveImageName(path)
+	if err != nil {
+		return name.Digest{}, err
+	}
+	fmt.Fprintf(opts.cmd.OutOrStdout(), "building image %s\n", imageName)
+
+	digestFile := dockerfile.DigestFile
+	if opts.LocalKaniko {
+		tmpFile, err := ioutil.TempFile("", "mink-digest-")
+		if err != nil {
+			return name.Digest{}, errs.Wrapf(err, "failed to create temp digest file")
+		}
+		digestFile = tmpFile.Name()
+	}
+	tr := dockerfile.Build(ctx, sourceSteps, tag, dockerfile.Options{
+		Dockerfile: opts.Dockerfile,
+		Path:       path,
+		DigestFile: digestFile,
 		KanikoArgs: opts.KanikoArgs,
 	})
 	tr.Namespace = Namespace()
@@ -438,11 +459,11 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 	}
 
 	if opts.LocalKaniko {
-		return opts.runLocalBuild(tr, opts.KanikoBinary, digestFile)
+		return opts.runLocalBuild(tr, opts.KanikoBinary, imageName, digestFile)
 	}
 	// Run the produced Build definition to completion, streaming logs to stdout, and
 	// returning the digest of the produced image.
-	digest, err := builds.Run(ctx, opts.ImageName, tr, &options.LogOptions{
+	digest, err := builds.Run(ctx, imageName, tr, &options.LogOptions{
 		Params: &cli.TektonParams{},
 		Stream: &cli.Stream{
 			Out: out,
@@ -457,6 +478,24 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 		return name.Digest{}, err
 	}
 	return digest, nil
+}
+
+// ResolveImageName allows environment variables to be used in the image string along with expressions for the
+// current directory name
+func (opts *ResolveOptions) ResolveImageName(path string) (string, name.Tag, error) {
+	_, dirName := filepath.Split(path)
+	image := os.Expand(opts.ImageName, func(name string) string {
+		answer := os.Getenv(name)
+		if answer == "" && name == "DIR_NAME" {
+			answer = dirName
+		}
+		return answer
+	})
+	tag, err := name.NewTag(image, name.WeakValidation)
+	if err != nil {
+		return image, tag, apis.ErrInvalidValue(err.Error(), "image")
+	}
+	return image, tag, nil
 }
 
 func (opts *ResolveOptions) bp(ctx context.Context, sourceSteps []tknv1beta1.Step, nameRefs []name.Reference, u *url.URL) (name.Digest, error) {
@@ -554,7 +593,7 @@ func (opts *ResolveOptions) refsFromDoc(doc *yaml.Node) yit.Iterator {
 		Filter(yit.Union(ps...))
 }
 
-func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, digestFile string) (name.Digest, error) {
+func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, imageName, digestFile string) (name.Digest, error) {
 	args := tr.Spec.TaskSpec.Steps[len(tr.Spec.TaskSpec.Steps)-1].Args
 
 	// lets replace the context with the current dir
@@ -599,5 +638,5 @@ func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, digest
 	}
 
 	value := strings.TrimSpace(string(data))
-	return name.NewDigest(opts.ImageName + "@" + value)
+	return name.NewDigest(imageName + "@" + value)
 }

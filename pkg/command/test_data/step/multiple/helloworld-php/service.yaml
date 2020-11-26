@@ -1,0 +1,14 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: helloworld-php
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+      - image: dockerfile:///helloworld-php
+        name: main
+        env:
+        - name: TARGET
+          value: "PHP Sample v1"

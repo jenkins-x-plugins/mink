@@ -36,6 +36,10 @@ type BaseBuildOptions struct {
 
 	// ServiceAccount is the name of the service account *as* which to run the build.
 	ServiceAccount string
+
+	// NoImageValidate disables image validation if using this command from a composite opertation
+	// which may resolve the image string using expressions
+	NoImageValidate bool
 }
 
 // BaseBuildOptions implements Interface
@@ -62,15 +66,16 @@ func (opts *BaseBuildOptions) Validate(cmd *cobra.Command, args []string) error 
 	opts.ImageName = viper.GetString("image")
 	if opts.ImageName == "" {
 		return apis.ErrMissingField("image")
-	} else if tag, err := name.NewTag(opts.ImageName, name.WeakValidation); err != nil {
-		return apis.ErrInvalidValue(err.Error(), "image")
-	} else {
-		opts.tag = tag
+	} else if !opts.NoImageValidate {
+		var err error
+		if opts.tag, err = name.NewTag(opts.ImageName, name.WeakValidation); err != nil {
+			return apis.ErrInvalidValue(err.Error(), "image")
+		}
 	}
 
 	opts.ServiceAccount = viper.GetString("as")
 	if opts.ServiceAccount == "" {
-		return apis.ErrMissingField("image")
+		return apis.ErrMissingField("as")
 	}
 
 	return nil

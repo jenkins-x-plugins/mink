@@ -1,6 +1,7 @@
 package command_test
 
 import (
+	"context"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -14,9 +15,8 @@ import (
 )
 
 var (
-	expectedDigest = "sha256:8e65ec4b80519d869e8d600fdf262c6e8cd3f6c7e8382406d9cb039f352a69bc"
-	image          = "gcr.io/jenkins-x-labs-bdd/myimage:latest"
 	gitURL         = "https://github.com/mattmoor/mink"
+	expectedDigest = "sha256:8e65ec4b80519d869e8d600fdf262c6e8cd3f6c7e8382406d9cb039f352a69bc"
 )
 
 func TestCommandStep(t *testing.T) {
@@ -26,21 +26,47 @@ func TestCommandStep(t *testing.T) {
 	t.Logf("running tests in %s\n", tmpDir)
 
 	testData := filepath.Join("test_data", "step")
-	fs, err := ioutil.ReadDir(testData)
 
-	for _, f := range fs {
-		if !f.IsDir() {
-			continue
-		}
-		name := f.Name()
+	testCases := []struct {
+		name           string
+		image          string
+		filenames      []string
+		resolvePath    []string
+		expectedImages []string
+	}{
+		{
+			name:           "dockerfile",
+			image:          "gcr.io/jenkins-x-labs-bdd/myimage:latest",
+			filenames:      []string{filepath.Join("charts", "myapp", "values.yaml")},
+			resolvePath:    []string{"image", "fullName"},
+			expectedImages: []string{"gcr.io/jenkins-x-labs-bdd/myimage:latest@" + expectedDigest},
+		},
+		{
+			name:  "multiple",
+			image: "gcr.io/jenkins-x-labs-bdd/$DIR_NAME:latest",
+			filenames: []string{
+				filepath.Join("helloworld-go", "service.yaml"),
+				filepath.Join("helloworld-nodejs", "service.yaml"),
+				filepath.Join("helloworld-php", "service.yaml"),
+			},
+			resolvePath: []string{"spec", "template", "spec", "containers", "[name=main]", "image"},
+			expectedImages: []string{"" +
+				"gcr.io/jenkins-x-labs-bdd/helloworld-go:latest@" + expectedDigest,
+				"gcr.io/jenkins-x-labs-bdd/helloworld-nodejs:latest@" + expectedDigest,
+				"gcr.io/jenkins-x-labs-bdd/helloworld-php:latest@" + expectedDigest,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		name := tc.name
+		image := tc.image
 		srcDir := filepath.Join(testData, name)
 		require.DirExists(t, srcDir)
 
 		destDir := filepath.Join(tmpDir, name)
 		err = files.CopyDirOverwrite(srcDir, destDir)
 		require.NoError(t, err, "failed to copy %s to %s", srcDir, destDir)
-
-		fileName := filepath.Join(destDir, "charts", "myapp", "values.yaml")
 
 		o := &command.StepOptions{}
 		cmd := command.NewStepCommand()
@@ -49,22 +75,33 @@ func TestCommandStep(t *testing.T) {
 			"--git-url", gitURL,
 			"--image", image,
 			"--no-git",
-			"--filename", fileName,
 			"--local-kaniko",
 			"--kaniko-binary", filepath.Join("test_data", "kaniko.sh"),
 		}
+
+		for _, f := range tc.filenames {
+			fileName := filepath.Join(destDir, f)
+			args = append(args, "--filename", fileName)
+		}
+
 		err = cmd.ParseFlags(args)
 		require.NoError(t, err, "failed to parse flags")
 		err = o.Validate(cmd, args)
 		require.NoError(t, err, "failed to validate command")
 
+		o.Ctx = context.TODO()
 		err = o.Execute(cmd, nil)
 		require.NoError(t, err, "failed for test %s", name)
 
 		t.Logf("test %s running in dir %s\n", name, destDir)
 
-		require.FileExists(t, fileName, "the file name should exist")
-		assertYamlFileHasStringValue(t, fileName, image+"@"+expectedDigest, "image", "fullName")
+		require.Len(t, tc.expectedImages, len(tc.filenames), "expected image should match the number of files")
+
+		for i, f := range tc.filenames {
+			fileName := filepath.Join(destDir, f)
+			require.FileExists(t, fileName, "the file name should exist")
+			assertYamlFileHasStringValue(t, fileName, tc.expectedImages[i], tc.resolvePath...)
+		}
 	}
 }
 
