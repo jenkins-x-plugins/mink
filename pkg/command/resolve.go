@@ -482,7 +482,7 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 	}
 
 	if opts.LocalKaniko {
-		return opts.runLocalBuild(tr, opts.KanikoBinary, imageName, digestFile)
+		return opts.runLocalBuild(tr, opts.KanikoBinary, imageName, path, digestFile)
 	}
 	// Run the produced Build definition to completion, streaming logs to stdout, and
 	// returning the digest of the produced image.
@@ -616,7 +616,7 @@ func (opts *ResolveOptions) refsFromDoc(doc *yaml.Node) yit.Iterator {
 		Filter(yit.Union(ps...))
 }
 
-func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, imageName, digestFile string) (name.Digest, error) {
+func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, imageName, path, digestFile string) (name.Digest, error) {
 	args := tr.Spec.TaskSpec.Steps[len(tr.Spec.TaskSpec.Steps)-1].Args
 
 	// lets replace the context with the current dir
@@ -625,6 +625,9 @@ func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, imageN
 		return name.Digest{}, errs.Wrapf(err, "failed to get current working directory")
 	}
 
+	if path != "" && path != "/" {
+		wd = filepath.Join(wd, path)
+	}
 	for i := range args {
 		arg := args[i]
 		if strings.HasPrefix(arg, "--context=") {
