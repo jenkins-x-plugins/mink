@@ -450,6 +450,12 @@ func (opts *ResolveOptions) db(ctx context.Context, sourceSteps []tknv1beta1.Ste
 
 	digestFile := dockerfile.DigestFile
 	if opts.LocalKaniko {
+		// lets make sure we have a tmp dir as it may not exist yet if inside, say, a kaniko image
+		tmpDir := os.TempDir()
+		err = os.MkdirAll(tmpDir, 0760)
+		if err != nil {
+			return name.Digest{}, errs.Wrapf(err, "failed to create temp dir %s", tmpDir)
+		}
 		tmpFile, err := ioutil.TempFile("", "mink-digest-")
 		if err != nil {
 			return name.Digest{}, errs.Wrapf(err, "failed to create temp digest file")
