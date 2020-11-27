@@ -27,17 +27,25 @@ func TestCommandStep(t *testing.T) {
 
 	testData := filepath.Join("test_data", "step")
 
+	chartTemplatesDir := filepath.Join("charts", "myapp", "templates")
 	testCases := []struct {
-		name           string
-		image          string
-		filenames      []string
-		resolvePath    []string
-		expectedImages []string
+		name              string
+		image             string
+		filenames         []string
+		args              []string
+		resolvePath       []string
+		expectedImages    []string
+		expectedFilenames []string
 	}{
+		{
+			name:  "no-image",
+			image: "gcr.io/jenkins-x-labs-bdd/myimage:latest",
+		},
 		{
 			name:           "dockerfile",
 			image:          "gcr.io/jenkins-x-labs-bdd/myimage:latest",
 			filenames:      []string{filepath.Join("charts", "myapp", "values.yaml")},
+			args:           []string{"--output", filepath.Join(tmpDir, "dockerfile")},
 			resolvePath:    []string{"image", "fullName"},
 			expectedImages: []string{"gcr.io/jenkins-x-labs-bdd/myimage:latest@" + expectedDigest},
 		},
@@ -49,11 +57,33 @@ func TestCommandStep(t *testing.T) {
 				filepath.Join("helloworld-nodejs", "service.yaml"),
 				filepath.Join("helloworld-php", "service.yaml"),
 			},
+			args:        []string{"--output", filepath.Join(tmpDir, "multiple")},
 			resolvePath: []string{"spec", "template", "spec", "containers", "[name=main]", "image"},
 			expectedImages: []string{"" +
 				"gcr.io/jenkins-x-labs-bdd/helloworld-go:latest@" + expectedDigest,
 				"gcr.io/jenkins-x-labs-bdd/helloworld-nodejs:latest@" + expectedDigest,
 				"gcr.io/jenkins-x-labs-bdd/helloworld-php:latest@" + expectedDigest,
+			},
+		},
+		{
+			name:  "multiple-as-chart",
+			image: "gcr.io/jenkins-x-labs-bdd/$DIR_NAME:latest",
+			filenames: []string{
+				filepath.Join("helloworld-go", "service.yaml"),
+				filepath.Join("helloworld-nodejs", "service.yaml"),
+				filepath.Join("helloworld-php", "service.yaml"),
+			},
+			args:        []string{"--flatten-output", "--output", filepath.Join(tmpDir, "multiple-as-chart", chartTemplatesDir)},
+			resolvePath: []string{"spec", "template", "spec", "containers", "[name=main]", "image"},
+			expectedImages: []string{"" +
+				"gcr.io/jenkins-x-labs-bdd/helloworld-go:latest@" + expectedDigest,
+				"gcr.io/jenkins-x-labs-bdd/helloworld-nodejs:latest@" + expectedDigest,
+				"gcr.io/jenkins-x-labs-bdd/helloworld-php:latest@" + expectedDigest,
+			},
+			expectedFilenames: []string{
+				filepath.Join(chartTemplatesDir, "helloworld-go-service.yaml"),
+				filepath.Join(chartTemplatesDir, "helloworld-nodejs-service.yaml"),
+				filepath.Join(chartTemplatesDir, "helloworld-php-service.yaml"),
 			},
 		},
 	}
@@ -78,6 +108,7 @@ func TestCommandStep(t *testing.T) {
 			"--local-kaniko",
 			"--kaniko-binary", filepath.Join("test_data", "kaniko.sh"),
 		}
+		args = append(args, tc.args...)
 
 		for _, f := range tc.filenames {
 			fileName := filepath.Join(destDir, f)
@@ -95,9 +126,13 @@ func TestCommandStep(t *testing.T) {
 
 		t.Logf("test %s running in dir %s\n", name, destDir)
 
-		require.Len(t, tc.expectedImages, len(tc.filenames), "expected image should match the number of files")
+		expectedFilenames := tc.expectedFilenames
+		if len(expectedFilenames) == 0 {
+			expectedFilenames = tc.filenames
+		}
+		require.Len(t, tc.expectedImages, len(expectedFilenames), "expected images should match the number of expected files")
 
-		for i, f := range tc.filenames {
+		for i, f := range expectedFilenames {
 			fileName := filepath.Join(destDir, f)
 			require.FileExists(t, fileName, "the file name should exist")
 			assertYamlFileHasStringValue(t, fileName, tc.expectedImages[i], tc.resolvePath...)

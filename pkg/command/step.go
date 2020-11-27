@@ -85,6 +85,8 @@ func (opts *StepOptions) Validate(cmd *cobra.Command, args []string) error {
 	viper.SetDefault("output", ".")
 	setViperGitAndKanikoDefaults(cmd.OutOrStdout())
 
+	opts.ResolveOptions.AllowNoFiles = true
+
 	// Validate the bundle arguments.
 	if err := opts.ResolveOptions.Validate(cmd, args); err != nil {
 		return err

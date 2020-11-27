@@ -96,10 +96,17 @@ type ResolveOptions struct {
 	dockerfileOptions
 	buildpackOptions
 
-	Filenames   []string
-	Recursive   bool
-	FailOnError bool
+	Filenames []string
+	Recursive bool
+
+	// LocalKaniko invoke kaniko locally rather that using a TaskRun. Typically used inside a Pipeline
 	LocalKaniko bool
+
+	// KanikoBinary the kaniko binary to use if performing local builds
+	KanikoBinary string
+
+	// AllowNoFiles with this setting it is valid to have no files to resolve
+	AllowNoFiles bool
 
 	Parallelism int
 
@@ -108,8 +115,10 @@ type ResolveOptions struct {
 	// Use a separate directory to avoid modifying the source
 	OutputDir string
 
-	// KanikoBinary the kaniko binary to use if performing local builds
-	KanikoBinary string
+	// FlattenOutput if there are multiple YAML files to output flatten them all into files in the output directory
+	// This is particularly useful if creating a Helm chart of all the YAML output files where you typically just want
+	// to put all the different YAML file names in the charts/mychart/templates folder
+	FlattenOutput bool
 
 	builders map[string]builder
 	cmd      *cobra.Command
@@ -130,10 +139,11 @@ func (opts *ResolveOptions) AddFlags(cmd *cobra.Command) {
 		"Filename, directory, or URL to files to use to create the resource")
 	cmd.Flags().BoolP("recursive", "R", false,
 		"Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
-	cmd.Flags().BoolP("local-kaniko", "L", false,
-		"Uses a local kaniko binary for building Dockerfile based builds instead of a separate TaskRun.")
 	cmd.Flags().IntP("parallelism", "P", 20, "How many parallel builds to run at once.")
 	cmd.Flags().StringP("output", "O", "", "Output directory for resolved YAML files to be written. If the current directory then the YAML files are resolved and modified in place. Otherwise the files are written to the output directory using relative paths from the current directory.")
+	cmd.Flags().Bool("flatten-output", false, "Put all of the output files into the output directory as files without a tree of directories. This is particularly useful if creating a Helm chart of all the YAML output files where you typically just want to put all the different YAML file names in, say, the charts/mychart/templates folder")
+	cmd.Flags().BoolP("local-kaniko", "L", false,
+		"Uses a local kaniko binary for building Dockerfile based builds instead of a separate TaskRun.")
 	cmd.Flags().StringP("kaniko-binary", "", "/kaniko/executor", "The kaniko/executor binary location if using local builds.")
 }
 
@@ -155,7 +165,9 @@ func (opts *ResolveOptions) Validate(cmd *cobra.Command, args []string) error {
 
 	opts.Filenames = viper.GetStringSlice("filename")
 	if len(opts.Filenames) == 0 {
-		return apis.ErrMissingField("filename")
+		if !opts.AllowNoFiles {
+			return apis.ErrMissingField("filename")
+		}
 	}
 	opts.Recursive = viper.GetBool("recursive")
 
@@ -167,6 +179,7 @@ func (opts *ResolveOptions) Validate(cmd *cobra.Command, args []string) error {
 	opts.LocalKaniko = viper.GetBool("local-kaniko")
 
 	opts.OutputDir = viper.GetString("output")
+	opts.FlattenOutput = viper.GetBool("flatten-output")
 
 	opts.KanikoBinary = viper.GetString("kaniko-binary")
 
@@ -241,17 +254,21 @@ func (opts *ResolveOptions) execute(ctx context.Context, cmd *cobra.Command) err
 
 func (opts *ResolveOptions) writeForFile(path string) (io.WriteCloser, error) {
 	if opts.OutputDir != "" {
-		dir, err := os.Getwd()
+		dir := opts.Directory
+		absDir, err := filepath.Abs(dir)
 		if err != nil {
-			return nil, errs.Wrapf(err, "failed to get current directory")
+			return nil, errs.Wrapf(err, "failed to find absolute path for %s", dir)
 		}
 		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return nil, errs.Wrapf(err, "failed to find absolute path for %s", path)
 		}
-		rel, err := filepath.Rel(dir, absPath)
+		rel, err := filepath.Rel(absDir, absPath)
 		if err != nil {
-			return nil, errs.Wrapf(err, "failed to find relative path for %s", absPath)
+			return nil, errs.Wrapf(err, "failed to find relative path for %s from %s", absPath, absDir)
+		}
+		if opts.FlattenOutput {
+			rel = strings.ReplaceAll(rel, string(os.PathSeparator), "-")
 		}
 		f := filepath.Join(opts.OutputDir, rel)
 		d := filepath.Dir(f)
