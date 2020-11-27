@@ -30,20 +30,33 @@ import (
 	"knative.dev/pkg/signals"
 )
 
-var stepExample = fmt.Sprintf(`
+var pkgShort = "Detects images if no .mink.yaml or explicit arguments are supplied, builds any images and resolves any YAML files/"
+var pkgLong = pkgShort + `
+
+This command is intended to be used inside a pipeline and can handle repositories which contain 0..N images. It defaults to outputting the modified YAML files with the image digest in place for a new release in a new branch/tag.
+
+If you are running this locally you may want to override the --output value to a different directory. 
+`
+var pkgExample = fmt.Sprintf(`
   # Generate a .mink.yaml file if it does not exist and a dockerfile or build pack can be detected
   # then build and publish references within .mink.yaml either outputs the YAML or saves it in place
-  %[1]s step
+  %[1]s package --image gcr.io/myproject/myimage:latest
+
+  # Resolves the images specified in the filename entries in .mink.yaml and then outputs the resolved 
+  # YAML files to charts/mychart/templates/*.yaml for releasing as a helm chart
+  %[1]s package --image gcr.io/myproject/\$DIR_NAME:latest --output charts/mychart/templates --flatten-output
 `, ExamplePrefix())
 
-// NewStepCommand implements 'kn-im resolve' command
-func NewStepCommand() *cobra.Command {
-	opts := &StepOptions{}
+// NewPackageCommand implements 'kn-im resolve' command
+func NewPackageCommand() *cobra.Command {
+	opts := &PackageOptions{}
 
 	cmd := &cobra.Command{
-		Use:     "step",
-		Short:   "Runs the pipeline step to build publish and resolve image references within a collection of yaml files if required.",
-		Example: stepExample,
+		Use:     "package",
+		Aliases: []string{"pkg"},
+		Short:   pkgShort,
+		Long:    pkgLong,
+		Example: pkgExample,
 		PreRunE: opts.Validate,
 		RunE:    opts.Execute,
 	}
@@ -53,8 +66,8 @@ func NewStepCommand() *cobra.Command {
 	return cmd
 }
 
-// StepOptions implements Interface for the `kn im resolve` command.
-type StepOptions struct {
+// PackageOptions implements Interface for the `kn im package` command.
+type PackageOptions struct {
 	// Inherit all of the resolve options.
 	ResolveOptions
 
@@ -67,12 +80,12 @@ type StepOptions struct {
 	Ctx context.Context
 }
 
-// StepOptions implements Interface
-var _ Interface = (*StepOptions)(nil)
+// PackageOptions implements Interface
+var _ Interface = (*PackageOptions)(nil)
 
 // AddFlags implements Interface
-func (opts *StepOptions) AddFlags(cmd *cobra.Command) {
-	opts.InitOptions.InStepCommand = true
+func (opts *PackageOptions) AddFlags(cmd *cobra.Command) {
+	opts.InitOptions.InPackageCommand = true
 
 	// Add the bundle flags to our surface.
 	opts.ResolveOptions.AddFlags(cmd)
@@ -81,7 +94,7 @@ func (opts *StepOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // Validate implements Interface
-func (opts *StepOptions) Validate(cmd *cobra.Command, args []string) error {
+func (opts *PackageOptions) Validate(cmd *cobra.Command, args []string) error {
 	viper.SetDefault("output", ".")
 	setViperGitAndKanikoDefaults(cmd.OutOrStdout())
 
@@ -100,7 +113,7 @@ func (opts *StepOptions) Validate(cmd *cobra.Command, args []string) error {
 }
 
 // Execute implements Interface
-func (opts *StepOptions) Execute(cmd *cobra.Command, args []string) error {
+func (opts *PackageOptions) Execute(cmd *cobra.Command, args []string) error {
 	// Handle ctrl+C
 	if opts.Ctx == nil {
 		opts.Ctx = signals.NewContext()
@@ -110,7 +123,7 @@ func (opts *StepOptions) Execute(cmd *cobra.Command, args []string) error {
 
 // execute is the workhorse of execute, but factored to support composition
 // with apply (provides its own ctx)
-func (opts *StepOptions) execute(ctx context.Context, cmd *cobra.Command) error {
+func (opts *PackageOptions) execute(ctx context.Context, cmd *cobra.Command) error {
 	if opts.Out == nil {
 		opts.Out = cmd.OutOrStdout()
 	}
@@ -132,7 +145,7 @@ func (opts *StepOptions) execute(ctx context.Context, cmd *cobra.Command) error 
 	return opts.ResolveOptions.execute(ctx, cmd)
 }
 
-func (opts *StepOptions) copyKanikoDockerSecrets() error {
+func (opts *PackageOptions) copyKanikoDockerSecrets() error {
 	glob := filepath.Join("/tekton", "creds-secrets", "*", ".dockerconfigjson")
 	fs, err := filepath.Glob(glob)
 	if err != nil {

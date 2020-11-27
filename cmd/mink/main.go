@@ -77,7 +77,7 @@ func init() {
 	rootCmd.AddCommand(command.NewBuildpackCommand())
 
 	rootCmd.AddCommand(command.NewResolveCommand())
-	rootCmd.AddCommand(command.NewStepCommand())
+	rootCmd.AddCommand(command.NewPackageCommand())
 	rootCmd.AddCommand(command.NewApplyCommand())
 
 	cobra.OnInitialize(initViperConfig)

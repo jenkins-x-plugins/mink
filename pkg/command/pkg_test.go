@@ -19,7 +19,7 @@ var (
 	expectedDigest = "sha256:8e65ec4b80519d869e8d600fdf262c6e8cd3f6c7e8382406d9cb039f352a69bc"
 )
 
-func TestCommandStep(t *testing.T) {
+func TestCommandPackage(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "")
 	require.NoError(t, err, "could not create temp dir")
 
@@ -98,8 +98,8 @@ func TestCommandStep(t *testing.T) {
 		err = files.CopyDirOverwrite(srcDir, destDir)
 		require.NoError(t, err, "failed to copy %s to %s", srcDir, destDir)
 
-		o := &command.StepOptions{}
-		cmd := command.NewStepCommand()
+		o := &command.PackageOptions{}
+		cmd := command.NewPackageCommand()
 		args := []string{
 			"--directory", destDir,
 			"--git-url", gitURL,
