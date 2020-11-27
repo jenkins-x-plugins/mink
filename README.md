@@ -32,7 +32,7 @@ Download the [jx-mink binary](https://github.com/jenkins-x-plugins/mink/releases
 The `jx-mink package` command is a plugin replacement for the [kaniko](https://github.com/GoogleContainerTools/kaniko) images we've been using in [Jenkins X V3](https://jenkins-x.io/v3/) up to now. Its used as follows:
 
 ```yaml 
-- image: gcr.io/jenkinsxio/jx-mink:0.19.8
+- image: gcr.io/jenkinsxio/jx-mink:0.19.14
   name: build-container-build
   script: |
     #!/busybox/sh
@@ -54,7 +54,7 @@ Finally the image digests will be added into any configured YAML file such as th
 If you wish to switch to using just [kaniko](https://github.com/GoogleContainerTools/kaniko) without using a `.mink.yaml` file and only creating a single image from a single `Dockerfile` then switch to using `jx-mink build`:
 
 ```yaml 
-- image: gcr.io/jenkinsxio/jx-mink:0.19.8
+- image: gcr.io/jenkinsxio/jx-mink:0.19.14
   name: build-container-build
   script: |
     #!/busybox/sh
@@ -122,6 +122,6 @@ This repository includes a few Pull Requests on mink ([#280](https://github.com/
 It also adds:
 
 * allows `--local-kaniko` for local kaniko invocation (so we can avoid an extra chained `TaskRun` by default in Jenkins X pipelines when running `kaniko` pipelines)
-* add a `init` command to create ` .mink.yam` file if one is not configured
+* add a `init` command to create ` .mink.yaml` file if one is not configured
 * adds a `package` command which runs the `init` command first then `resolve` and terminates gracefully if there is no `.mink.yaml` that is defined or can be detected or there are no `filenames` specified. Also this command defaults to outputting the resolved YAML in place for a release/preview environment.
 * supports additional flags like `--output`, `--flatten-output` for easier packaging of knative microservices into a helm chart for releases and preview environments
