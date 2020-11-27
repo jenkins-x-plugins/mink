@@ -625,13 +625,14 @@ func (opts *ResolveOptions) runLocalBuild(tr *tknv1beta1.TaskRun, binary, imageN
 		return name.Digest{}, errs.Wrapf(err, "failed to get current working directory")
 	}
 
+	context := wd
 	if path != "" && path != "/" {
-		wd = filepath.Join(wd, path)
+		context = filepath.Join(wd, path)
 	}
 	for i := range args {
 		arg := args[i]
 		if strings.HasPrefix(arg, "--context=") {
-			args[i] = "--context=" + wd
+			args[i] = "--context=" + context
 		} else if strings.HasPrefix(arg, "--dockerfile=/workspace") {
 			args[i] = "--dockerfile=" + wd + arg[len("--dockerfile=/workspace"):]
 		}
